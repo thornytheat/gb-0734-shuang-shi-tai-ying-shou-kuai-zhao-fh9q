@@ -20,6 +20,8 @@ REASONS = {
     "TARGET_SCOPE": "引用版本与发票、客户或有效日不匹配",
     "NO_ACTIVE_VERSION": "变更有效日无可用版本",
     "EXCEEDS_BALANCE": "本笔变更超过可冲减余额",
+    "CROSS_SOURCE_DUPLICATE": "后续收件中重复的跨来源凭证",
+    "CROSS_SOURCE_CONFLICT": "与已采信事件同号不同内容，隔离后来收件",
 }
 
 

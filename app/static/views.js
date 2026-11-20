@@ -210,3 +210,68 @@ export function history(runs, selected, pick) {
     ['生成时间', instant(selected.generated_at)], ['规则版本', selected.rule_version], ['耗时 ms', selected.elapsed_ms]]));
   else $('archive-detail').replaceChildren(node('p', '请选择归档批次', 'empty'));
 }
+
+const restateClasses = {LATE_REPORT: '补报', CORRECTION: '更正'};
+const restatePolicies = {ARCHIVE_PLUS_SUPPLEMENTS: '原归档叠加补报（采纳）', LATEST_INTAKE_ONLY: '最新收件整体重算（未采纳）'};
+
+function restateEventEvidence(row) {
+  return evidence(row.event.event_id, () => [eventSection('补报凭证', row.event,
+    [['来路分类', restateClasses[row.class]], ['收件序号', row.source_seq],
+     ['收件来源', row.source_id], ['物理行', row.source_line], ['来源角色', row.source_role]])]);
+}
+
+function restateIssues(host, rows) {
+  table(host, ['事件', '原因码', '原因', '收件序号', ['物理行', 'num'], '证据'], rows.map((row) => [
+    cell(row.event_id, 'mono'), cell(row.code, 'mono warn'), row.message,
+    number(row.source_seq), number(row.source_line ?? row.line),
+    evidence(row.code, () => [evidenceSection('隔离 / 重复凭证',
+      [['事件编号', row.event_id], ['原因', row.message], ['收件来源', row.source_id],
+       ['收件序号', row.source_seq], ['物理行', row.source_line ?? row.line],
+       ...(row.related ? [['同号已采信事件', row.related.map((item) => item.event_id).join('、')]] : [])], row.raw)])])),
+    '暂无跨来源重复或隔离记录');
+}
+
+export function restatement(data, runs, selectedId, select) {
+  table('restate-list', ['重述批次', '原结账批次', '生成时间', '规则版本'], runs.map((run) => {
+    const button = node('button', run.restate_id.slice(0, 12), 'evidence-btn mono');
+    button.type = 'button';
+    button.setAttribute('aria-pressed', String(selectedId === run.restate_id));
+    button.addEventListener('click', () => select(run.restate_id));
+    return [button, cell(run.parent_run_id.slice(0, 12), 'mono'), instant(run.generated_at), run.rule_version];
+  }), '尚无重述批次');
+  if (!data) {
+    $('restate-summary').replaceChildren(node('p', '请先生成重述批次', 'empty'));
+    $('restate-evidence').replaceChildren(node('p', '请先生成重述批次', 'empty'));
+    $('restate-balance').textContent = '';
+    return;
+  }
+  const result = data.result;
+  const recon = result.attribution.balance_reconciliation;
+  const alt = result.alternatives[0];
+  $('restate-balance').textContent = `重述批次 ${data.manifest.restate_id.slice(0, 12)} · 重述知悉截止 ${result.restatement.restate_period.closing.known}`;
+  $('restate-summary').replaceChildren(definitions([
+    ['原结账批次', result.parent.run_id.slice(0, 12)],
+    ['原结账余额', money(recon.original_closing_cents)],
+    ['＋ 补报净影响', money(recon.late_balance_cents)],
+    ['＋ 更正净影响', money(recon.correction_balance_cents)],
+    ['＝ 重述后余额', money(recon.restated_closing_cents)],
+    ['勾稽差额', money(recon.difference_cents)],
+    ['采纳口径', restatePolicies[result.policy]],
+    ['未采纳口径余额', money(alt.closing_totals.balance_cents)],
+    ['口径差异（未采纳−采纳）', money(alt.difference_vs_adopted_cents)],
+  ]));
+  const rows = result.supplement_evidence.accepted.map((row) => [
+    cell(row.event.event_id, 'mono'), cell(row.event.invoice_id, 'mono'), kindNames[row.event.kind],
+    restateClasses[row.class], number(row.source_seq), number(row.source_line),
+    money(row.event.amount_cents), restateEventEvidence(row)]);
+  table('restate-evidence', ['事件', '发票', '类型', '来路', ['收件序号', 'num'], ['物理行', 'num'], ['金额', 'num'], '证据'],
+    rows, '补充来源中暂无被采信的凭证');
+  const host = $('restate-evidence');
+  const old = $('restate-evidence-issues');
+  if (old) old.remove();
+  host.append(node('h3', '跨来源重复与隔离', ''));
+  const wrap = node('div');
+  wrap.id = 'restate-evidence-issues';
+  host.append(wrap);
+  restateIssues(wrap, [...result.supplement_evidence.duplicates, ...result.supplement_evidence.quarantine]);
+}

@@ -2,7 +2,8 @@ import { axis, localInstant } from './axis.js';
 import * as view from './views.js';
 
 const { $ } = view;
-const state = {source: null, page: 'snapshot', cut: null, runs: [], selected: null, token: 0, busy: false, exact: {}};
+const state = {source: null, page: 'snapshot', cut: null, runs: [], selected: null, token: 0, busy: false, exact: {},
+  restateRuns: [], restateSelected: null, restateDetail: null, allSources: []};
 const pages = [...document.querySelectorAll('[data-page]')];
 const links = [...document.querySelectorAll('nav a')];
 const form = $('cuts');
@@ -31,8 +32,11 @@ function controls() {
   $('rerun').disabled = state.busy || !state.selected;
   $('upload').querySelector('button').disabled = state.busy;
   const link = $('export');
-  if (state.selected) {
-    link.href = `/api/archive/${state.selected.run_id}/export`;
+  const target = state.page === 'restatement'
+    ? (state.restateSelected ? `/api/restatement/${state.restateSelected}/export` : null)
+    : (state.selected ? `/api/archive/${state.selected.run_id}/export` : null);
+  if (target) {
+    link.href = target;
     link.removeAttribute('aria-disabled');
   } else {
     link.removeAttribute('href');
@@ -95,6 +99,13 @@ async function refresh() {
       axis($('axis-known'), 'known', state.source.axis.known, data.cut.known, (stamp) => pick('known', stamp));
     } else if (page === 'intake') {
       view.intake(state.source);
+    } else if (page === 'restatement') {
+      const [historyReply, sourcesReply] = await Promise.all([
+        request('/api/restatement'), request('/api/intake')]);
+      if (token !== state.token) return;
+      state.restateRuns = historyReply.restatements;
+      state.allSources = sourcesReply.sources;
+      renderRestatement();
     } else {
       const data = await request(`/api/${page}?${query}`);
       if (token !== state.token) return;
@@ -196,6 +207,61 @@ $('rerun').addEventListener('click', () => act(async () => {
   refresh();
   feedback('重跑一致，归档批次号不变');
 }));
+
+function renderSourceOptions() {
+  const select = $('restate-sources');
+  const current = [...select.selectedOptions].map((option) => option.value);
+  select.replaceChildren(...state.allSources.map((row) => {
+    const option = new Option(`${row.source_id.slice(0, 12)} · ${row.bytes} B`, row.source_id);
+    option.selected = current.includes(row.source_id);
+    return option;
+  }));
+}
+
+async function renderRestatement() {
+  renderSourceOptions();
+  $('restate-parent').value = state.selected?.run_id ?? '';
+  $('restate-rerun').disabled = state.busy || !state.restateSelected;
+  state.restateDetail = state.restateSelected
+    ? await request(`/api/restatement/${state.restateSelected}`) : null;
+  view.restatement(state.restateDetail, state.restateRuns, state.restateSelected, async (id) => {
+    state.restateSelected = id;
+    controls();
+    await act(renderRestatement);
+  });
+  controls();
+}
+
+$('restate-sample').addEventListener('click', () => act(async () => {
+  await request('/api/intake/sample-supplement');
+  state.allSources = (await request('/api/intake')).sources;
+  renderSourceOptions();
+  feedback('样例补报已收件，可在补报列表中选择');
+}));
+
+$('restate-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const parent = state.selected?.run_id;
+  const supplements = [...$('restate-sources').selectedOptions].map((option) => option.value);
+  if (!parent) return feedback('请先在「快照归档」选择原结账批次', 'bad');
+  if (!supplements.length) return feedback('请至少选择一份补报收件', 'bad');
+  const known = `${$('restate-known').value}${zone}`;
+  act(async () => {
+    const reply = await request('/api/restatement', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({parent_run_id: parent, supplement_source_ids: supplements, restate_known: known})});
+    state.restateSelected = reply.manifest.restate_id;
+    await refresh();
+    feedback(reply.created ? '重述批次已生成' : '同口径重述已存在，复用原批次');
+  });
+});
+
+$('restate-rerun').addEventListener('click', () => act(async () => {
+  const reply = await request(`/api/restatement/${state.restateSelected}/rerun`, {method: 'POST'});
+  state.restateSelected = reply.manifest.restate_id;
+  await refresh();
+  feedback('重跑一致，重述批次号不变');
+}));
+
 window.addEventListener('hashchange', () => { switchPage(); feedback(); refresh(); });
 switchPage();
 state.cut = formCut();

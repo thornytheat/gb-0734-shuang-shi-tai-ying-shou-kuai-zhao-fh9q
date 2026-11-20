@@ -3,6 +3,7 @@ from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parent
 SAMPLE = APP_DIR.parent / "sample_data" / "receivable.csv"
+SAMPLE_SUPPLEMENT = APP_DIR.parent / "sample_data" / "supplement.csv"
 MAX_BYTES = 2 * 1024 * 1024
 MAX_ROWS = 5000
 RULE_VERSION = "ar-bitemporal-1"

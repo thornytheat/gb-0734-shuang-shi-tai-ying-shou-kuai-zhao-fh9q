@@ -25,3 +25,20 @@
   <section class="panel wide-panel"><div class="panel-head"><h2>归档批次</h2><button id="rerun" class="btn" type="button" disabled>重跑归档</button></div><div id="archive-list" class="scroll-table"></div></section>
   <section class="panel"><div class="panel-head"><h2>运行清单</h2></div><div id="archive-detail" class="panel-body"><p class="empty">请选择归档批次</p></div></section>
 </section>
+<section data-page="restatement" class="grid ledger-grid" hidden>
+  <section class="panel wide-panel"><div class="panel-head"><h2>创建重述批次</h2><span class="subtle">原归档 + 补报，叠加口径</span></div>
+    <div class="panel-body">
+      <form id="restate-form" class="upload-form">
+        <label class="field">原结账批次<input type="text" id="restate-parent" readonly required></label>
+        <label class="field">重述知悉截止<input type="datetime-local" step="0.001" id="restate-known" value="2026-03-01T12:00" required></label>
+        <label class="field">补报收件（按收件顺序，可多选）<select id="restate-sources" multiple size="5" required style="grid-column: 1 / -1"></select></label>
+        <button class="btn btn-primary" type="submit">生成重述批次</button>
+        <button class="btn" type="button" id="restate-sample">载入样例补报</button>
+      </form>
+      <p id="restate-balance" class="mono"></p>
+    </div>
+  </section>
+  <section class="panel"><div class="panel-head"><h2>来路余额</h2><span class="subtle">原结账 → 补报 / 更正 → 重述</span></div><div id="restate-summary" class="panel-body"><p class="empty">请先生成重述批次</p></div></section>
+  <section class="panel wide-panel"><div class="panel-head"><h2>重述批次</h2><button id="restate-rerun" class="btn" type="button" disabled>重跑重述</button></div><div id="restate-list" class="scroll-table"></div></section>
+  <section class="panel span-all"><div class="panel-head"><h2>补报与更正凭证来路</h2><span class="subtle">逐凭证挂回收件来源与物理行</span></div><div id="restate-evidence" class="scroll-table"></div></section>
+</section>

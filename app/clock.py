@@ -77,3 +77,9 @@ class ArchiveRequest(BaseModel):
 
     def period(self):
         return period_query(self.open_effective, self.open_known, self.effective, self.known)
+
+
+class RestatementRequest(BaseModel):
+    parent_run_id: str
+    supplement_source_ids: list[str]
+    restate_known: str

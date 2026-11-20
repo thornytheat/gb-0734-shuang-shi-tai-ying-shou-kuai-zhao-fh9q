@@ -11,9 +11,10 @@ docker compose exec -T app pytest -q
 
 打开 [工作台](http://localhost:18423/) 或 [接口文档](http://localhost:18423/docs)。服务启动时幂等载入 `sample_data/receivable.csv`。首页默认显示样例的 2025 年末至 2026 年 1 月末。业务有效轴和知悉轴都可选刻度，也可在工具条编辑切点。返回「载入样例」可恢复预设。
 
-- 「变更收件」可上传分部的 `sample_data/branch-gb18030.csv` 或查看隔离原值。
+- 「变更收件」可上传分部的 `sample_data/branch-gb18030.csv` 或查看隔离原值；`sample_data/supplement.csv` 是结账后补报样例，工作台「期间重述」页可一键载入。
 - 「期间桥接」可查看总账、五个账龄桶与逐发票变动。
 - 「归档快照」保存当前期间，在「快照归档」可选历史记录、重跑和导出一份 JSON 证据。
+- 「期间重述」对已归档批次叠加补报：原批次面额、证据和摘要原样保留，重述批次挂回原批次并把每张补报、更正凭证追到收件来源与物理行；同一份补充重跑不产生新批次，导出同时给出采纳的叠加口径与未采纳的「最新收件整体重算」余额差异。
 - 容器的 SQLite 位于命名卷 `workbench`。如需重建并确认可丢弃所有本地归档与导入文件，执行 `docker compose down -v` 后重新启动。
 
 ### 本地运行
@@ -37,5 +38,6 @@ python -m uvicorn app.main:app --port 18423
 | 迟报回补 | `GET /api/backfill` | 固定期初有效日后的事件及余额变化 |
 | 期间桥接 | `GET /api/bridge` | 期初、迟报、迁移、本期与期末 |
 | 快照归档 | `GET/POST /api/archive` | 批次与摘要、幂等重跑与证据 |
+| 期间重述 | `GET/POST /api/restatement` | 原批次叠加补报、更正归属、口径差异与来路导出 |
 
 [数据定义](docs/DATA-DICTIONARY.md)说明日期边界、冲突取舍和对账公式。[深度登记](docs/DEPTH.md)列出可重复验证的情形。

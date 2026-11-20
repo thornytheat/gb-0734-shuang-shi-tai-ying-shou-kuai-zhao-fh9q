@@ -14,6 +14,7 @@
 | M5 迟报回补 | 固定期初有效日对比两个知悉截面 | `GET /api/backfill` | `app/modules/m5_backfill/service.py` `app/modules/m5_backfill/changes.py` | `tests/test_backfill.py` |
 | M6 期间桥接 | 勾稽总金额和每桶迁移 | `GET /api/bridge` | `app/modules/m6_bridge/ledger.py` `app/modules/m6_bridge/bucket_flow.py` | `tests/test_bridge.py` |
 | M7 快照归档 | 保存、重算和导出证据 | `POST /api/archive` | `app/modules/m7_archive/service.py` `app/modules/m7_archive/export.py` | `tests/test_archive.py` |
+| M8 期间重述 | 已归档期间叠加补报重述并保留下路 | `POST /api/restatement` | `app/modules/m8_restatement/merge.py` `app/modules/m8_restatement/service.py` | `tests/test_restatement.py` |
 
 ## 陷阱登记
 
@@ -37,6 +38,13 @@
 | TRAP-23 | D-V1 与 D-V2 相邻 | 终日重复选中 | 有效区间右开 | `app/modules/m2_versions/book.py` | `tests/test_versions.py::test_adjacent_intervals_exclusive_end` |
 | TRAP-25 | C-OV 与采信版交叠 | 随排序取错发票金额 | 保留早知悉有效版并披露交叠 | `app/modules/m2_versions/rules.py` | `tests/test_versions.py::test_overlap_reject_keeps_prior_version` |
 | TRAP-26 | 测试追加陈旧的 A 修订 | 用旧父版覆盖当前版 | 校验父版可用性 | `app/modules/m2_versions/rules.py` | `tests/test_versions.py::test_stale_parent_cannot_overwrite_new_revision` |
+| TRAP-27 | 补报含 E-P1 同内容副本 | 同一收款二次入账 | 跨来源副本记 `CROSS_SOURCE_DUPLICATE` 并保留最早收件 | `app/modules/m8_restatement/merge.py` | `tests/test_restatement.py::test_cross_source_duplicate_is_suppressed_with_provenance` |
+| TRAP-28 | 补报重发 H-V1 但金额不同 | 后来文件覆盖原归档面额 | `CROSS_SOURCE_CONFLICT` 只隔离后来者，原票不动 | `app/modules/m8_restatement/merge.py` | `tests/test_restatement.py::test_cross_source_conflict_keeps_earliest_and_isolates_later` |
+| TRAP-29 | 样例内 REV-PAST 同号两次 | 合并层把来源内部冲突误判成跨来源冲突 | 跨来源裁决只作用于更早收件，内部冲突留给 M1 | `app/modules/m8_restatement/merge.py` | `tests/test_restatement.py::test_same_source_internal_conflict_is_not_retried_as_cross_source` |
+| TRAP-30 | 多份来源物理行号都从 1 开始 | 重述证据行号撞车、来路丢失 | 合成行号 `seq × 100000 + 物理行`，provenance 记录原始行 | `app/modules/m8_restatement/merge.py` | `tests/test_restatement.py::test_merged_intake_keeps_parent_events_and_synthetic_lines` |
+| TRAP-31 | 只拿最新收件整体重算 | 原归档已采信凭证全部丢失 | 该口径标记未采纳并导出余额差异，采纳叠加口径 | `app/modules/m8_restatement/service.py` | `tests/test_restatement.py::test_latest_intake_only_alternative_is_exported_and_marked_not_adopted` |
+| TRAP-32 | 同一份补充反复提交 | 重述批次被重复生成 | 编号由来源清单与切点决定，冲突不插入 | `app/modules/m8_restatement/repository.py` | `tests/test_restatement.py::test_same_supplements_do_not_generate_a_second_batch` |
+| TRAP-33 | 重述切点早于补充凭证知悉时间 | 部分凭证被静默漏掉 | `EVIDENCE_AFTER_CUT` 拒绝出批次 | `app/modules/m8_restatement/service.py` | `tests/test_restatement.py::test_cut_must_cover_all_supplement_vouchers` |
 
 ## 对账断言
 
